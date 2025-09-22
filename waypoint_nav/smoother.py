@@ -23,7 +23,7 @@ class PathSmoother(Node):
             [5.0, 0.0]
         ])
 
-        # Hardcoded waypoints (x, y)
+       
         """self.waypoints = np.array([
             [0.0, 0.0],   
             [1.0, 1.0],    

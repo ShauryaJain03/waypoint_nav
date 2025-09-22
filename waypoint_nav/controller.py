@@ -7,8 +7,7 @@ import numpy as np
 import math
 
 def quaternion_to_yaw(qx, qy, qz, qw):
-    """Return yaw angle (radians) from quaternion (ROS order x,y,z,w)."""
-    # Standard conversion
+
     siny_cosp = 2.0 * (qw * qz + qx * qy)
     cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
     return math.atan2(siny_cosp, cosy_cosp)
@@ -17,16 +16,15 @@ class PurePursuitController(Node):
     def __init__(self):
         super().__init__('pure_pursuit_controller_fixed')
 
-        # Parameters (tune as needed)
-        self.declare_parameter('control_rate', 20.0)            # run controller at 20Hz
-        self.declare_parameter('lookahead_dist', 0.35)         # meters
-        self.declare_parameter('max_linear_speed', 0.20)       # m/s
-        self.declare_parameter('max_angular_speed', 2.5)       # rad/s
-        self.declare_parameter('k_linear', 0.8)                # linear gain
-        self.declare_parameter('k_angular', 2.0)               # angular gain
-        self.declare_parameter('goal_threshold', 0.10)         # meters to consider goal reached
-        self.declare_parameter('yaw_stop_threshold', 0.6)      # radians: if > this, rotate in place
-        self.declare_parameter('min_move_dist', 0.02)          # ignore extremely close points
+        self.declare_parameter('control_rate', 20.0)           
+        self.declare_parameter('lookahead_dist', 0.35)        
+        self.declare_parameter('max_linear_speed', 0.20)      
+        self.declare_parameter('max_angular_speed', 2.5)       
+        self.declare_parameter('k_linear', 0.8)                
+        self.declare_parameter('k_angular', 2.0)               
+        self.declare_parameter('goal_threshold', 0.10)         
+        self.declare_parameter('yaw_stop_threshold', 0.6)      
+        self.declare_parameter('min_move_dist', 0.02)         
 
         self.control_rate = float(self.get_parameter('control_rate').value)
         self.lookahead_dist = float(self.get_parameter('lookahead_dist').value)
@@ -38,16 +36,13 @@ class PurePursuitController(Node):
         self.yaw_stop_threshold = float(self.get_parameter('yaw_stop_threshold').value)
         self.min_move_dist = float(self.get_parameter('min_move_dist').value)
 
-        # State
-        self.odom_pose = None       # (x, y, yaw)
-        self.traj_points = None     # Nx2 numpy array of (x,y)
+        self.odom_pose = None      
+        self.traj_points = None     
 
-        # Subscribers & publisher
         self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
         self.create_subscription(Path, '/trajectory', self.trajectory_cb, 10)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-        # Control loop timer
         self.timer = self.create_timer(1.0 / self.control_rate, self.control_loop)
 
         self.get_logger().info('Pure Pursuit Controller (fixed) initialized.')
@@ -75,7 +70,6 @@ class PurePursuitController(Node):
 
         rx, ry, ryaw = self.odom_pose
 
-        # Goal check (last point)
         gx, gy = float(self.traj_points[-1, 0]), float(self.traj_points[-1, 1])
         dist_to_goal = math.hypot(gx - rx, gy - ry)
         if dist_to_goal <= self.goal_threshold:
@@ -83,59 +77,49 @@ class PurePursuitController(Node):
             self._publish_stop()
             return
 
-        # compute vector to each trajectory point and their distances & relative angles
-        deltas = self.traj_points - np.array([rx, ry])  # Nx2
+        deltas = self.traj_points - np.array([rx, ry])  
         dists = np.linalg.norm(deltas, axis=1)
-        angles_to_pts = np.arctan2(deltas[:,1], deltas[:,0])  # absolute headings
-        angle_diffs = np.array([self._angle_diff(a, ryaw) for a in angles_to_pts])  # relative to robot yaw
+        angles_to_pts = np.arctan2(deltas[:,1], deltas[:,0]) 
+        angle_diffs = np.array([self._angle_diff(a, ryaw) for a in angles_to_pts])  
 
-        # prefer points that are in front of the robot (|angle| < 90deg) and at least min_move_dist away
         front_mask = (np.abs(angle_diffs) <= (math.pi/2)) & (dists > self.min_move_dist)
         idxs_front = np.where(front_mask)[0]
 
         if idxs_front.size > 0:
             start_idx = int(idxs_front[0])
         else:
-            # if no front points, use the nearest point (but if extremely near, skip)
             idxs_far = np.where(dists > self.min_move_dist)[0]
             if idxs_far.size == 0:
                 self._publish_stop()
                 return
             start_idx = int(idxs_far[0])
 
-        # Advance from start_idx until accumulated distance >= lookahead_dist
         lookahead_idx = self._advance_to_lookahead(start_idx)
 
         tx = float(self.traj_points[lookahead_idx, 0])
         ty = float(self.traj_points[lookahead_idx, 1])
 
-        # compute control based on robot frame
         dx = tx - rx
         dy = ty - ry
         target_dist = math.hypot(dx, dy)
         target_yaw = math.atan2(dy, dx)
         yaw_error = self._angle_diff(target_yaw, ryaw)
 
-        # decide linear speed:
-        # - if yaw error is large -> rotate in place (linear = 0) to stabilize heading
+
         if abs(yaw_error) > self.yaw_stop_threshold:
             linear_speed = 0.0
         else:
-            # proportional on distance (but not too aggressive)
             linear_speed = self.k_linear * target_dist
             linear_speed = max(0.0, min(linear_speed, self.max_linear_speed))
 
-        # angular speed proportional to yaw error
         angular_speed = self.k_angular * yaw_error
         angular_speed = max(-self.max_angular_speed, min(self.max_angular_speed, angular_speed))
 
-        # publish twist
         twist = Twist()
         twist.linear.x = float(linear_speed)
         twist.angular.z = float(angular_speed)
         self.cmd_pub.publish(twist)
 
-        # occasional debug logs - reduce log level if noisy
         self.get_logger().debug(
             f"start_idx={start_idx} lookahead_idx={lookahead_idx} tx={tx:.2f},{ty:.2f} "
             f"dist={target_dist:.3f} yaw_err={yaw_error:.3f} lin={linear_speed:.3f} ang={angular_speed:.3f}"
