@@ -11,7 +11,6 @@ class PathSmoother(Node):
     def __init__(self):
         super().__init__('path_smoother')
 
-        # Publisher for trajectory
         self.path_pub = self.create_publisher(Path, '/trajectory', 10)
 
         self.waypoints = np.array([ 
@@ -74,18 +73,14 @@ class PathSmoother(Node):
 
 
 
-        # Precompute smoothed path
         self.path_msg = self._compute_smoothed_path(self.waypoints, num_samples=100)
         self.get_logger().info(f"Prepared smoothed path with {len(self.path_msg.poses)} points")
 
-        # Publish periodically so subscribers/rviz definitely receive it
         self.timer = self.create_timer(1.0, self.timer_callback)  # 1 Hz
 
     def _compute_smoothed_path(self, waypoints, num_samples=50, frame_id='odom'):
-        """
-        Build a nav_msgs/Path from cubic spline interpolation of waypoints.
-        """
-        t = np.arange(len(waypoints))  # parameter 0..N-1
+
+        t = np.arange(len(waypoints)) 
         cs_x = CubicSpline(t, waypoints[:, 0])
         cs_y = CubicSpline(t, waypoints[:, 1])
 
@@ -99,7 +94,6 @@ class PathSmoother(Node):
         for x, y in zip(x_smooth, y_smooth):
             pose = PoseStamped()
             pose.header.frame_id = frame_id
-            # leave header.stamp blank now; will fill before publishing
             pose.pose.position.x = float(x)
             pose.pose.position.y = float(y)
             pose.pose.position.z = 0.0
@@ -112,12 +106,10 @@ class PathSmoother(Node):
         return path_msg
 
     def timer_callback(self):
-        # update header stamps to "now"
         now = self.get_clock().now().to_msg()
         self.path_msg.header.stamp = now
         for pose in self.path_msg.poses:
             pose.header.stamp = now
-        # publish
         self.path_pub.publish(self.path_msg)
         self.get_logger().debug("Published /trajectory")
 
