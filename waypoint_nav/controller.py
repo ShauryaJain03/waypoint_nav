@@ -2,167 +2,237 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path, Odometry
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
+from tf_transformations import euler_from_quaternion
 import numpy as np
 import math
 
-def quaternion_to_yaw(qx, qy, qz, qw):
-
-    siny_cosp = 2.0 * (qw * qz + qx * qy)
-    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
-    return math.atan2(siny_cosp, cosy_cosp)
-
-class PurePursuitController(Node):
+class TrajectoryController(Node):
     def __init__(self):
-        super().__init__('pure_pursuit_controller_fixed')
-
-        self.declare_parameter('control_rate', 20.0)           
-        self.declare_parameter('lookahead_dist', 0.35)        
-        self.declare_parameter('max_linear_speed', 0.20)      
-        self.declare_parameter('max_angular_speed', 2.5)       
-        self.declare_parameter('k_linear', 0.8)                
-        self.declare_parameter('k_angular', 2.0)               
-        self.declare_parameter('goal_threshold', 0.10)         
-        self.declare_parameter('yaw_stop_threshold', 0.6)      
-        self.declare_parameter('min_move_dist', 0.02)         
-
-        self.control_rate = float(self.get_parameter('control_rate').value)
-        self.lookahead_dist = float(self.get_parameter('lookahead_dist').value)
-        self.max_linear_speed = float(self.get_parameter('max_linear_speed').value)
-        self.max_angular_speed = float(self.get_parameter('max_angular_speed').value)
-        self.k_linear = float(self.get_parameter('k_linear').value)
-        self.k_angular = float(self.get_parameter('k_angular').value)
-        self.goal_threshold = float(self.get_parameter('goal_threshold').value)
-        self.yaw_stop_threshold = float(self.get_parameter('yaw_stop_threshold').value)
-        self.min_move_dist = float(self.get_parameter('min_move_dist').value)
-
-        self.odom_pose = None      
-        self.traj_points = None     
-
-        self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
-        self.create_subscription(Path, '/trajectory', self.trajectory_cb, 10)
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-
-        self.timer = self.create_timer(1.0 / self.control_rate, self.control_loop)
-
-        self.get_logger().info('Pure Pursuit Controller (fixed) initialized.')
-
-    def odom_cb(self, msg: Odometry):
-        x = float(msg.pose.pose.position.x)
-        y = float(msg.pose.pose.position.y)
-        q = msg.pose.pose.orientation
-        yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w)
-        self.odom_pose = (x, y, yaw)
-
-    def trajectory_cb(self, msg: Path):
-        if len(msg.poses) == 0:
-            self.get_logger().warn('Received empty /trajectory')
-            return
-        pts = []
-        for p in msg.poses:
-            pts.append([float(p.pose.position.x), float(p.pose.position.y)])
-        self.traj_points = np.array(pts)
-        self.get_logger().info(f'Received trajectory with {len(self.traj_points)} points')
-
-    def control_loop(self):
-        if self.odom_pose is None or self.traj_points is None or len(self.traj_points) == 0:
-            return
-
-        rx, ry, ryaw = self.odom_pose
-
-        gx, gy = float(self.traj_points[-1, 0]), float(self.traj_points[-1, 1])
-        dist_to_goal = math.hypot(gx - rx, gy - ry)
-        if dist_to_goal <= self.goal_threshold:
-            self.get_logger().info('Goal reached. Stopping robot.')
-            self._publish_stop()
-            return
-
-        deltas = self.traj_points - np.array([rx, ry])  
-        dists = np.linalg.norm(deltas, axis=1)
-        angles_to_pts = np.arctan2(deltas[:,1], deltas[:,0]) 
-        angle_diffs = np.array([self._angle_diff(a, ryaw) for a in angles_to_pts])  
-
-        front_mask = (np.abs(angle_diffs) <= (math.pi/2)) & (dists > self.min_move_dist)
-        idxs_front = np.where(front_mask)[0]
-
-        if idxs_front.size > 0:
-            start_idx = int(idxs_front[0])
+        super().__init__('trajectory_controller')
+        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.trajectory_sub = self.create_subscription(
+            Path, '/trajectory', self.trajectory_callback, 10)
+        self.odom_sub = self.create_subscription(
+            Odometry, '/odom', self.odom_callback, 10)
+        
+        self.declare_parameters(namespace='', parameters=[
+            ('lookahead_distance', 0.3),
+            ('max_linear_velocity', 0.5),
+            ('max_angular_velocity', 1.0),
+            ('position_tolerance', 0.1),
+            ('orientation_tolerance', 0.1),
+            ('kp_linear', 1.0),
+            ('ki_linear', 0.0),
+            ('kd_linear', 0.1),
+            ('kp_angular', 2.0),
+            ('ki_angular', 0.0),
+            ('kd_angular', 0.1),
+        ])
+        
+        self.lookahead_distance = self.get_parameter('lookahead_distance').value
+        self.max_linear_vel = self.get_parameter('max_linear_velocity').value
+        self.max_angular_vel = self.get_parameter('max_angular_velocity').value
+        self.pos_tolerance = self.get_parameter('position_tolerance').value
+        self.orient_tolerance = self.get_parameter('orientation_tolerance').value
+        
+        self.kp_linear = self.get_parameter('kp_linear').value
+        self.ki_linear = self.get_parameter('ki_linear').value
+        self.kd_linear = self.get_parameter('kd_linear').value
+        self.kp_angular = self.get_parameter('kp_angular').value
+        self.ki_angular = self.get_parameter('ki_angular').value
+        self.kd_angular = self.get_parameter('kd_angular').value
+        
+        self.current_pose = None
+        self.trajectory = None
+        self.trajectory_start_time = None
+        self.current_target_idx = 0
+        self.trajectory_complete = False
+        
+        self.prev_linear_error = 0.0
+        self.prev_angular_error = 0.0
+        self.linear_error_sum = 0.0
+        self.angular_error_sum = 0.0
+        self.prev_time = None
+        
+        self.control_timer = self.create_timer(0.05, self.control_callback) 
+        
+        self.get_logger().info("Trajectory Controller initialized")
+    
+    def trajectory_callback(self, msg):
+        self.trajectory = msg
+        self.trajectory_start_time = self.get_clock().now()
+        self.current_target_idx = 0
+        self.trajectory_complete = False
+        
+        self.prev_linear_error = 0.0
+        self.prev_angular_error = 0.0
+        self.linear_error_sum = 0.0
+        self.angular_error_sum = 0.0
+        self.prev_time = None
+        
+        self.get_logger().info(f"Received new trajectory with {len(msg.poses)} points")
+    
+    def odom_callback(self, msg):
+        self.current_pose = msg.pose.pose
+    
+    def find_target_point(self):
+        if not self.trajectory or not self.current_pose:
+            return None, -1
+        
+        current_pos = np.array([
+            self.current_pose.position.x,
+            self.current_pose.position.y
+        ])
+        
+        min_dist = float('inf')
+        closest_idx = self.current_target_idx
+        
+        for i in range(self.current_target_idx, len(self.trajectory.poses)):
+            traj_pos = np.array([
+                self.trajectory.poses[i].pose.position.x,
+                self.trajectory.poses[i].pose.position.y
+            ])
+            
+            dist = np.linalg.norm(current_pos - traj_pos)
+            if dist < min_dist:
+                min_dist = dist
+                closest_idx = i
+        
+        target_idx = closest_idx
+        for i in range(closest_idx, len(self.trajectory.poses)):
+            traj_pos = np.array([
+                self.trajectory.poses[i].pose.position.x,
+                self.trajectory.poses[i].pose.position.y
+            ])
+            
+            dist = np.linalg.norm(current_pos - traj_pos)
+            if dist >= self.lookahead_distance:
+                target_idx = i
+                break
+            target_idx = i
+        
+        self.current_target_idx = max(closest_idx, self.current_target_idx)
+        
+        return self.trajectory.poses[target_idx], target_idx
+    
+    def compute_control_commands(self, target_pose):
+        if not self.current_pose or not target_pose:
+            return 0.0, 0.0
+        
+        current_x = self.current_pose.position.x
+        current_y = self.current_pose.position.y
+        current_quat = self.current_pose.orientation
+        _, _, current_yaw = euler_from_quaternion([
+            current_quat.x, current_quat.y, current_quat.z, current_quat.w
+        ])
+        
+        target_x = target_pose.pose.position.x
+        target_y = target_pose.pose.position.y
+        
+        dx = target_x - current_x
+        dy = target_y - current_y
+        distance_error = math.sqrt(dx*dx + dy*dy)
+        
+        desired_yaw = math.atan2(dy, dx)
+        angular_error = self.normalize_angle(desired_yaw - current_yaw)
+        
+        current_time = self.get_clock().now()
+        if self.prev_time is None:
+            dt = 0.05 
         else:
-            idxs_far = np.where(dists > self.min_move_dist)[0]
-            if idxs_far.size == 0:
-                self._publish_stop()
-                return
-            start_idx = int(idxs_far[0])
-
-        lookahead_idx = self._advance_to_lookahead(start_idx)
-
-        tx = float(self.traj_points[lookahead_idx, 0])
-        ty = float(self.traj_points[lookahead_idx, 1])
-
-        dx = tx - rx
-        dy = ty - ry
-        target_dist = math.hypot(dx, dy)
-        target_yaw = math.atan2(dy, dx)
-        yaw_error = self._angle_diff(target_yaw, ryaw)
-
-
-        if abs(yaw_error) > self.yaw_stop_threshold:
-            linear_speed = 0.0
-        else:
-            linear_speed = self.k_linear * target_dist
-            linear_speed = max(0.0, min(linear_speed, self.max_linear_speed))
-
-        angular_speed = self.k_angular * yaw_error
-        angular_speed = max(-self.max_angular_speed, min(self.max_angular_speed, angular_speed))
-
-        twist = Twist()
-        twist.linear.x = float(linear_speed)
-        twist.angular.z = float(angular_speed)
-        self.cmd_pub.publish(twist)
-
-        self.get_logger().debug(
-            f"start_idx={start_idx} lookahead_idx={lookahead_idx} tx={tx:.2f},{ty:.2f} "
-            f"dist={target_dist:.3f} yaw_err={yaw_error:.3f} lin={linear_speed:.3f} ang={angular_speed:.3f}"
-        )
-
-    def _advance_to_lookahead(self, start_idx):
-        N = len(self.traj_points)
-        if start_idx >= N:
-            return N - 1
-        acc = 0.0
-        prev = self.traj_points[start_idx]
-        for i in range(start_idx + 1, N):
-            p = self.traj_points[i]
-            seg = np.linalg.norm(p - prev)
-            acc += seg
-            prev = p
-            if acc >= self.lookahead_dist:
-                return i
-        return N - 1
-
-    def _angle_diff(self, a, b):
-        d = a - b
-        while d > math.pi:
-            d -= 2.0 * math.pi
-        while d < -math.pi:
-            d += 2.0 * math.pi
-        return d
-
-    def _publish_stop(self):
-        t = Twist()
-        t.linear.x = 0.0
-        t.angular.z = 0.0
-        self.cmd_pub.publish(t)
+            dt = (current_time - self.prev_time).nanoseconds / 1e9
+        self.prev_time = current_time
+        
+        linear_derivative = (distance_error - self.prev_linear_error) / dt if dt > 0 else 0.0
+        self.linear_error_sum += distance_error * dt
+        
+        linear_vel = (self.kp_linear * distance_error + 
+                     self.ki_linear * self.linear_error_sum +
+                     self.kd_linear * linear_derivative)
+        
+        angular_derivative = (angular_error - self.prev_angular_error) / dt if dt > 0 else 0.0
+        self.angular_error_sum += angular_error * dt
+        
+        angular_vel = (self.kp_angular * angular_error +
+                      self.ki_angular * self.angular_error_sum +
+                      self.kd_angular * angular_derivative)
+        
+        linear_vel = max(-self.max_linear_vel, min(self.max_linear_vel, linear_vel))
+        angular_vel = max(-self.max_angular_vel, min(self.max_angular_vel, angular_vel))
+        
+        if abs(angular_error) > 0.5: 
+            linear_vel *= 0.5
+        
+        self.prev_linear_error = distance_error
+        self.prev_angular_error = angular_error
+        
+        return linear_vel, angular_vel
+    
+    def normalize_angle(self, angle):
+        while angle > math.pi:
+            angle -= 2.0 * math.pi
+        while angle < -math.pi:
+            angle += 2.0 * math.pi
+        return angle
+    
+    def is_trajectory_complete(self):
+        if not self.trajectory or not self.current_pose:
+            return False
+        
+        if self.current_target_idx >= len(self.trajectory.poses) - 1:
+            final_pose = self.trajectory.poses[-1]
+            dx = final_pose.pose.position.x - self.current_pose.position.x
+            dy = final_pose.pose.position.y - self.current_pose.position.y
+            distance = math.sqrt(dx*dx + dy*dy)
+            
+            return distance < self.pos_tolerance
+        
+        return False
+    
+    def control_callback(self):
+        if self.trajectory_complete or not self.trajectory or not self.current_pose:
+            cmd = Twist()
+            self.cmd_vel_pub.publish(cmd)
+            return
+        
+        if self.is_trajectory_complete():
+            self.trajectory_complete = True
+            cmd = Twist()
+            self.cmd_vel_pub.publish(cmd)
+            self.get_logger().info("Trajectory completed!")
+            return
+        
+        target_pose, target_idx = self.find_target_point()
+        
+        if target_pose is None:
+            cmd = Twist()
+            self.cmd_vel_pub.publish(cmd)
+            return
+        
+        linear_vel, angular_vel = self.compute_control_commands(target_pose)
+        
+        cmd = Twist()
+        cmd.linear.x = linear_vel
+        cmd.angular.z = angular_vel
+        self.cmd_vel_pub.publish(cmd)
+        
+        if self.current_target_idx % 10 == 0: 
+            self.get_logger().debug(
+                f"Tracking point {target_idx}/{len(self.trajectory.poses)-1}, "
+                f"cmd_vel: linear={linear_vel:.3f}, angular={angular_vel:.3f}"
+            )
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PurePursuitController()
+    controller_node = TrajectoryController()
+    
     try:
-        rclpy.spin(node)
+        rclpy.spin(controller_node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
+        controller_node.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':
