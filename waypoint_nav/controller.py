@@ -154,7 +154,7 @@ class TrajectoryController(Node):
         angular_derivative = (angular_error - self.prev_angular_error) / dt if dt > 0 else 0.0
         self.angular_error_sum += angular_error * dt
         
-        angular_vel = (self.kp_angular * angular_error +
+        angular_vel = (self.kp_angular * angular_error +    
                       self.ki_angular * self.angular_error_sum +
                       self.kd_angular * angular_derivative)
         

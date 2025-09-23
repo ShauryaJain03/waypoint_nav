@@ -238,6 +238,10 @@ class PathSmoother(Node):
         self.timer = self.create_timer(1.0, self.timer_callback)  # 1 Hz
 
     def _compute_smoothed_path_with_time(self, waypoints, num_samples=50, frame_id='odom'):
+        if waypoints.size == 0:
+            self.get_logger().warn("No waypoints provided. Returning empty path.")
+            return Path(), []
+        
         t = np.arange(len(waypoints)) 
         cs_x = CubicSpline(t, waypoints[:, 0])
         cs_y = CubicSpline(t, waypoints[:, 1])
@@ -295,3 +299,10 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
+
+

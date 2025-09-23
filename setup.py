@@ -24,7 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             "smoother=waypoint_nav.smoother:main",
-            "controller=waypoint_nav.controller:main"
+            "controller=waypoint_nav.controller:main",
+            "obstacle=waypoint_nav.obstacle:main"
         ],
     },
 )
