@@ -10,258 +10,64 @@ from builtin_interfaces.msg import Time
 class PathSmoother(Node):
     def __init__(self):
         super().__init__('path_smoother')
-
         self.path_pub = self.create_publisher(Path, '/trajectory', 10)
-        """self.waypoints = np.array([ 
-            [0.0, 0.0], 
-            [1.0, 0.5], 
-            [2.0, 1.0], 
-            [3.0, 1.0], 
-            [4.0, 0.5], 
-            [5.0, 0.0]
-        ]) """
 
-
-        """
         self.waypoints = np.array([
-            [0.0, 0.0],   
-            [1.0, 1.0],    
-            [2.5, -0.5],
-            [3.0, 2.0],    
-            [4.5, 1.5],    
-            [5.0, 3.0],   
-            [6.5, 0.0],   
-            [7.0, -1.5],   
-            [8.0, 1.0],    
-            [9.0, 0.0],    
-        ]) """
-
-
-        """self.waypoints = np.array([
             [0.0, 0.0],
-            [1.0, 1.0],
-            [2.0, -1.0],
-            [3.0, 1.0],
-            [4.0, -1.0],
-            [5.0, 1.0],
-            [6.0, 0.0],
-        ]) """
-
-
-        """self.waypoints = np.array([
-            [0.0, 0.0],
-            [1.0, 0.0],
+            [1.0, 0.5],
             [2.0, 1.0],
-            [2.0, 2.5],
-            [1.0, 3.5],
-            [0.0, 3.0],
-            [-0.5, 2.0],
-            [0.0, 1.0],
-            [0.5, 0.5],
-        ]) """
-
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [2.0, 0.0],
-            [4.0, 0.0],
-            [4.0, -2.0],   
-            [2.0, -2.5],   
-            [0.0, -2.0],  
-            [1.5, -0.5],   
-            [3.0, -1.5],
-            [4.5, -0.5],
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [1.0, 0.3],
-            [2.0, 0.8],
-            [3.0, 0.2],
-            [4.0, -0.5],
-            [5.0, -1.0],
-            [6.0, -0.7],
-            [7.0, 0.1],
-            [8.0, 0.9],
-            [9.0, 1.5],
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [1.5, -0.5],
-            [2.0, -1.5],
-            [2.5, -0.7],
-            [3.5, 0.0],
-            [4.0, 1.0],
-            [5.0, 1.5],
-            [6.0, 1.0],
-            [7.5, 0.5],
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [1.0, 1.0],
-            [1.0, 2.0],
-            [2.0, 2.5],
-            [3.0, 1.5],
-            [3.5, 0.5],
-            [2.5, -0.5],
-            [1.5, -1.5],
-            [0.0, -1.0],
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [0.5, -0.4],
-            [1.0, -0.9],
-            [1.5, -1.1],
-            [2.0, -1.0],
-            [2.5, -0.6],
-            [3.0, -0.2],
-            [3.5, 0.3],
-            [4.0, 0.8],
-            [4.5, 1.1],
-            [5.0, 1.3],
-            [5.5, 1.2],
-            [6.0, 1.0],
-            [6.5, 0.5],
-            [7.0, 0.0],
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [0.7, 0.3],
-            [1.4, 0.8],
-            [2.1, 1.3],
-            [2.8, 1.1],
-            [3.5, 0.7],
-            [4.0, 0.0],
-            [4.3, -0.6],
-            [4.5, -1.2],
-            [4.8, -1.8],
-            [5.1, -1.5],
-            [5.7, -1.0],
-            [6.1, -0.3],
-            [6.5, 0.5],
-            [7.0, 1.2],
-            [7.5, 1.8],
-            [8.0, 1.5],
-            [8.5, 0.7],
-            [9.0, 0.0],
-            [9.5, -0.5]
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [0.5, 0.2],
-            [1.0, 0.7],
-            [1.5, 1.1],
-            [2.0, 0.9],
-            [2.3, 0.5],
-            [2.6, 0.0],
-            [3.0, -0.6],
-            [3.4, -1.0],
-            [3.8, -1.3],
-            [4.2, -1.6],
-            [4.6, -1.4],
-            [5.0, -1.0],
-            [5.4, -0.4],
-            [5.7, 0.0],
-            [6.1, 0.6],
-            [6.5, 1.1],
-            [6.9, 1.3],
-            [7.3, 1.0],
-            [7.7, 0.6]
-        ]) """
-
-
-        self.waypoints = np.array([
-            [0.0, 0.0],
-            [0.3, -0.3],
-            [0.7, -0.8],
-            [1.0, -1.2],
-            [1.3, -1.5],
-            [1.7, -1.7],
-            [2.1, -1.6],
-            [2.4, -1.4],
-            [2.7, -1.0],
-            [3.0, -0.5],
-            [3.4, 0.0],
-            [3.8, 0.6],
-            [4.2, 1.0],
-            [4.6, 1.3],
-            [5.0, 1.5],
-            [5.4, 1.3],
-            [5.8, 1.0],
-            [6.2, 0.6],
-            [6.6, 0.2],
-            [7.0, -0.1]
+            [3.0, 1.0],
+            [4.0, 0.5],
+            [5.0, 0.0]
         ])
 
-
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [0.5, -0.2],
-            [1.5, -0.4],
-            [2.5, -0.1],
-            [3.0, 0.5],
-            [3.5, 1.0],
-            [4.0, 1.7],
-            [5.0, 2.0],
-            [6.0, 1.5],
-            [7.0, 0.8],
-        ]) """
-
-        """ self.waypoints = np.array([
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [2.0, 0.5],
-            [2.5, 1.5],
-            [3.0, 2.5],
-            [4.0, 2.0],
-            [5.0, 1.0],
-            [6.0, 0.5],
-            [7.0, 0.0],
-            [8.0, -0.5],
-        ]) """
-
-        self.desired_velocity = 0.5  
+        self.desired_velocity = 0.5
         self.num_samples = 100
 
         self.smoothed_path, self.relative_times = self._compute_smoothed_path_with_time(
-            self.waypoints,
-            num_samples=self.num_samples
+            self.waypoints, num_samples=self.num_samples
         )
-        self.get_logger().info(f"prepared smoothed path with {len(self.smoothed_path.poses)} points and time-parameterization")
+        self.get_logger().info(f"Prepared smoothed path with {len(self.smoothed_path.poses)} points.")
 
-        self.timer = self.create_timer(1.0, self.timer_callback)  # 1 Hz
+        self.timer = self.create_timer(1.0, self.timer_callback)  
 
     def _compute_smoothed_path_with_time(self, waypoints, num_samples=50, frame_id='odom'):
-        if waypoints.size == 0:
-            self.get_logger().warn("No waypoints provided. Returning empty path.")
+        if waypoints is None or waypoints.size == 0:
+            self.get_logger().warn("No waypoints provided.")
             return Path(), []
-        
-        t = np.arange(len(waypoints)) 
+
+        if len(waypoints) == 1:
+            self.get_logger().warn("Only one waypoint provided.")
+            pose = PoseStamped()
+            pose.header.frame_id = frame_id
+            pose.pose.position.x = float(waypoints[0, 0])
+            pose.pose.position.y = float(waypoints[0, 1])
+            pose.pose.position.z = 0.0
+            pose.pose.orientation.w = 1.0
+            path_msg = Path()
+            path_msg.header.frame_id = frame_id
+            path_msg.poses.append(pose)
+            return path_msg, [0.0]
+
+        if self.desired_velocity <= 0.0:
+            self.get_logger().warn("Desired velocity <= 0. Using default 0.5 m/s")
+            self.desired_velocity = 0.5
+
+        t = np.arange(len(waypoints))
         cs_x = CubicSpline(t, waypoints[:, 0])
         cs_y = CubicSpline(t, waypoints[:, 1])
-
         t_new = np.linspace(0, len(waypoints)-1, num_samples)
         x_smooth = cs_x(t_new)
         y_smooth = cs_y(t_new)
 
         diffs = np.diff(np.stack([x_smooth, y_smooth], axis=1), axis=0)
         segment_lengths = np.linalg.norm(diffs, axis=1)
-        arc_lengths = np.hstack(([0.0], np.cumsum(segment_lengths)))  
-
-        if self.desired_velocity <= 0.0:
-            self.desired_velocity = 0.5 
-        relative_times = arc_lengths / self.desired_velocity  
+        arc_lengths = np.hstack(([0.0], np.cumsum(segment_lengths)))
+        relative_times = arc_lengths / self.desired_velocity
 
         path_msg = Path()
         path_msg.header.frame_id = frame_id
-
-        for idx, (x, y) in enumerate(zip(x_smooth, y_smooth)):
+        for x, y in zip(x_smooth, y_smooth):
             pose = PoseStamped()
             pose.header.frame_id = frame_id
             pose.pose.position.x = float(x)
@@ -276,6 +82,10 @@ class PathSmoother(Node):
         return path_msg, relative_times
 
     def timer_callback(self):
+        if not self.smoothed_path.poses:
+            self.get_logger().warn("Smoothed path is empty. Nothing to publish.")
+            return
+
         now = self.get_clock().now()
         self.smoothed_path.header.stamp = now.to_msg()
         for idx, pose in enumerate(self.smoothed_path.poses):
@@ -283,8 +93,9 @@ class PathSmoother(Node):
             nsec_offset = int((self.relative_times[idx] - t_offset) * 1e9)
             pose.header.stamp.sec = now.seconds_nanoseconds()[0] + t_offset
             pose.header.stamp.nanosec = now.seconds_nanoseconds()[1] + nsec_offset
+
         self.path_pub.publish(self.smoothed_path)
-        self.get_logger().debug("Published time-parameterized /trajectory")
+        self.get_logger().debug("Published /trajectory")
 
 def main(args=None):
     rclpy.init(args=args)
@@ -299,10 +110,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-

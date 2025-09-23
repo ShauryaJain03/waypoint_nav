@@ -6,6 +6,7 @@ from geometry_msgs.msg import Twist, PoseStamped
 from tf_transformations import euler_from_quaternion
 import numpy as np
 import math
+import traceback
 
 class TrajectoryController(Node):
     def __init__(self):
@@ -56,10 +57,15 @@ class TrajectoryController(Node):
         self.prev_time = None
         
         self.control_timer = self.create_timer(0.05, self.control_callback) 
-        
         self.get_logger().info("Trajectory Controller initialized")
     
+
     def trajectory_callback(self, msg):
+        if msg is None or len(msg.poses) == 0:
+            self.get_logger().warn("Received empty trajectory, ignoring.")
+            self.trajectory = None
+            return
+
         self.trajectory = msg
         self.trajectory_start_time = self.get_clock().now()
         self.current_target_idx = 0
@@ -73,160 +79,172 @@ class TrajectoryController(Node):
         
         self.get_logger().info(f"Received new trajectory with {len(msg.poses)} points")
     
+
     def odom_callback(self, msg):
+        if msg is None:
+            self.get_logger().warn("Received None odometry message.")
+            return
         self.current_pose = msg.pose.pose
-    
+
     def find_target_point(self):
-        if not self.trajectory or not self.current_pose:
-            return None, -1
-        
-        current_pos = np.array([
-            self.current_pose.position.x,
-            self.current_pose.position.y
-        ])
-        
-        min_dist = float('inf')
-        closest_idx = self.current_target_idx
-        
-        for i in range(self.current_target_idx, len(self.trajectory.poses)):
-            traj_pos = np.array([
-                self.trajectory.poses[i].pose.position.x,
-                self.trajectory.poses[i].pose.position.y
+        try:
+            if not self.trajectory or not self.current_pose or len(self.trajectory.poses) == 0:
+                return None, -1
+            
+            current_pos = np.array([
+                self.current_pose.position.x,
+                self.current_pose.position.y
             ])
             
-            dist = np.linalg.norm(current_pos - traj_pos)
-            if dist < min_dist:
-                min_dist = dist
-                closest_idx = i
-        
-        target_idx = closest_idx
-        for i in range(closest_idx, len(self.trajectory.poses)):
-            traj_pos = np.array([
-                self.trajectory.poses[i].pose.position.x,
-                self.trajectory.poses[i].pose.position.y
-            ])
+            min_dist = float('inf')
+            closest_idx = self.current_target_idx
+            for i in range(self.current_target_idx, len(self.trajectory.poses)):
+                traj_pos = np.array([
+                    self.trajectory.poses[i].pose.position.x,
+                    self.trajectory.poses[i].pose.position.y
+                ])
+                dist = np.linalg.norm(current_pos - traj_pos)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_idx = i
             
-            dist = np.linalg.norm(current_pos - traj_pos)
-            if dist >= self.lookahead_distance:
+            target_idx = closest_idx
+            for i in range(closest_idx, len(self.trajectory.poses)):
+                traj_pos = np.array([
+                    self.trajectory.poses[i].pose.position.x,
+                    self.trajectory.poses[i].pose.position.y
+                ])
+                dist = np.linalg.norm(current_pos - traj_pos)
+                if dist >= self.lookahead_distance:
+                    target_idx = i
+                    break
                 target_idx = i
-                break
-            target_idx = i
-        
-        self.current_target_idx = max(closest_idx, self.current_target_idx)
-        
-        return self.trajectory.poses[target_idx], target_idx
-    
-    def compute_control_commands(self, target_pose):
-        if not self.current_pose or not target_pose:
-            return 0.0, 0.0
-        
-        current_x = self.current_pose.position.x
-        current_y = self.current_pose.position.y
-        current_quat = self.current_pose.orientation
-        _, _, current_yaw = euler_from_quaternion([
-            current_quat.x, current_quat.y, current_quat.z, current_quat.w
-        ])
-        
-        target_x = target_pose.pose.position.x
-        target_y = target_pose.pose.position.y
-        
-        dx = target_x - current_x
-        dy = target_y - current_y
-        distance_error = math.sqrt(dx*dx + dy*dy)
-        
-        desired_yaw = math.atan2(dy, dx)
-        angular_error = self.normalize_angle(desired_yaw - current_yaw)
-        
-        current_time = self.get_clock().now()
-        if self.prev_time is None:
-            dt = 0.05 
-        else:
-            dt = (current_time - self.prev_time).nanoseconds / 1e9
-        self.prev_time = current_time
-        
-        linear_derivative = (distance_error - self.prev_linear_error) / dt if dt > 0 else 0.0
-        self.linear_error_sum += distance_error * dt
-        
-        linear_vel = (self.kp_linear * distance_error + 
-                     self.ki_linear * self.linear_error_sum +
-                     self.kd_linear * linear_derivative)
-        
-        angular_derivative = (angular_error - self.prev_angular_error) / dt if dt > 0 else 0.0
-        self.angular_error_sum += angular_error * dt
-        
-        angular_vel = (self.kp_angular * angular_error +    
-                      self.ki_angular * self.angular_error_sum +
-                      self.kd_angular * angular_derivative)
-        
-        linear_vel = max(-self.max_linear_vel, min(self.max_linear_vel, linear_vel))
-        angular_vel = max(-self.max_angular_vel, min(self.max_angular_vel, angular_vel))
-        
-        if abs(angular_error) > 0.5: 
-            linear_vel *= 0.5
-        
-        self.prev_linear_error = distance_error
-        self.prev_angular_error = angular_error
-        
-        return linear_vel, angular_vel
-    
-    def normalize_angle(self, angle):
-        while angle > math.pi:
-            angle -= 2.0 * math.pi
-        while angle < -math.pi:
-            angle += 2.0 * math.pi
-        return angle
-    
-    def is_trajectory_complete(self):
-        if not self.trajectory or not self.current_pose:
-            return False
-        
-        if self.current_target_idx >= len(self.trajectory.poses) - 1:
-            final_pose = self.trajectory.poses[-1]
-            dx = final_pose.pose.position.x - self.current_pose.position.x
-            dy = final_pose.pose.position.y - self.current_pose.position.y
-            distance = math.sqrt(dx*dx + dy*dy)
             
-            return distance < self.pos_tolerance
-        
-        return False
+            self.current_target_idx = max(closest_idx, self.current_target_idx)
+            return self.trajectory.poses[target_idx], target_idx
+        except Exception as e:
+            self.get_logger().error(f"Error in find_target_point: {e}\n{traceback.format_exc()}")
+            return None, -1
     
+
+    def compute_control_commands(self, target_pose):
+        try:
+            if not self.current_pose or not target_pose:
+                return 0.0, 0.0
+            
+            current_x = self.current_pose.position.x
+            current_y = self.current_pose.position.y
+            current_quat = self.current_pose.orientation
+            _, _, current_yaw = euler_from_quaternion([
+                current_quat.x, current_quat.y, current_quat.z, current_quat.w
+            ])
+            
+            target_x = target_pose.pose.position.x
+            target_y = target_pose.pose.position.y
+            
+            dx = target_x - current_x
+            dy = target_y - current_y
+            distance_error = math.hypot(dx, dy)
+            
+            desired_yaw = math.atan2(dy, dx)
+            angular_error = self.normalize_angle(desired_yaw - current_yaw)
+            
+            current_time = self.get_clock().now()
+            dt = 0.05 if self.prev_time is None else max(
+                (current_time - self.prev_time).nanoseconds / 1e9, 1e-6)
+            self.prev_time = current_time
+            
+            linear_derivative = (distance_error - self.prev_linear_error) / dt
+            self.linear_error_sum += distance_error * dt
+            
+            linear_vel = (self.kp_linear * distance_error + 
+                         self.ki_linear * self.linear_error_sum +
+                         self.kd_linear * linear_derivative)
+            
+            angular_derivative = (angular_error - self.prev_angular_error) / dt
+            self.angular_error_sum += angular_error * dt
+            
+            angular_vel = (self.kp_angular * angular_error +    
+                          self.ki_angular * self.angular_error_sum +
+                          self.kd_angular * angular_derivative)
+            
+            linear_vel = max(-self.max_linear_vel, min(self.max_linear_vel, linear_vel))
+            angular_vel = max(-self.max_angular_vel, min(self.max_angular_vel, angular_vel))
+            
+            if abs(angular_error) > 0.5: 
+                linear_vel *= 0.5
+            
+            self.prev_linear_error = distance_error
+            self.prev_angular_error = angular_error
+            
+            return linear_vel, angular_vel
+        except Exception as e:
+            self.get_logger().error(f"Error in compute_control_commands: {e}\n{traceback.format_exc()}")
+            return 0.0, 0.0
+
+    def normalize_angle(self, angle):
+        try:
+            while angle > math.pi:
+                angle -= 2.0 * math.pi
+            while angle < -math.pi:
+                angle += 2.0 * math.pi
+            return angle
+        except Exception as e:
+            self.get_logger().error(f"Error in normalize_angle: {e}")
+            return 0.0
+
+    def is_trajectory_complete(self):
+        try:
+            if not self.trajectory or not self.current_pose or len(self.trajectory.poses) == 0:
+                return False
+            
+            if self.current_target_idx >= len(self.trajectory.poses) - 1:
+                final_pose = self.trajectory.poses[-1]
+                dx = final_pose.pose.position.x - self.current_pose.position.x
+                dy = final_pose.pose.position.y - self.current_pose.position.y
+                distance = math.hypot(dx, dy)
+                return distance < self.pos_tolerance
+            return False
+        except Exception as e:
+            self.get_logger().error(f"Error in is_trajectory_complete: {e}")
+            return False
+    
+
     def control_callback(self):
-        if self.trajectory_complete or not self.trajectory or not self.current_pose:
+        try:
+            if self.trajectory_complete or not self.trajectory or not self.current_pose:
+                self.cmd_vel_pub.publish(Twist())
+                return
+            
+            if self.is_trajectory_complete():
+                self.trajectory_complete = True
+                self.cmd_vel_pub.publish(Twist())
+                self.get_logger().info("Trajectory completed!")
+                return
+            
+            target_pose, target_idx = self.find_target_point()
+            if target_pose is None:
+                self.cmd_vel_pub.publish(Twist())
+                return
+            
+            linear_vel, angular_vel = self.compute_control_commands(target_pose)
             cmd = Twist()
+            cmd.linear.x = linear_vel
+            cmd.angular.z = angular_vel
             self.cmd_vel_pub.publish(cmd)
-            return
-        
-        if self.is_trajectory_complete():
-            self.trajectory_complete = True
-            cmd = Twist()
-            self.cmd_vel_pub.publish(cmd)
-            self.get_logger().info("Trajectory completed!")
-            return
-        
-        target_pose, target_idx = self.find_target_point()
-        
-        if target_pose is None:
-            cmd = Twist()
-            self.cmd_vel_pub.publish(cmd)
-            return
-        
-        linear_vel, angular_vel = self.compute_control_commands(target_pose)
-        
-        cmd = Twist()
-        cmd.linear.x = linear_vel
-        cmd.angular.z = angular_vel
-        self.cmd_vel_pub.publish(cmd)
-        
-        if self.current_target_idx % 10 == 0: 
-            self.get_logger().debug(
-                f"Tracking point {target_idx}/{len(self.trajectory.poses)-1}, "
-                f"cmd_vel: linear={linear_vel:.3f}, angular={angular_vel:.3f}"
-            )
+            
+            if self.current_target_idx % 10 == 0:
+                self.get_logger().debug(
+                    f"Tracking point {target_idx}/{len(self.trajectory.poses)-1}, "
+                    f"cmd_vel: linear={linear_vel:.3f}, angular={angular_vel:.3f}"
+                )
+        except Exception as e:
+            self.get_logger().error(f"Error in control_callback: {e}\n{traceback.format_exc()}")
+
 
 def main(args=None):
     rclpy.init(args=args)
     controller_node = TrajectoryController()
-    
     try:
         rclpy.spin(controller_node)
     except KeyboardInterrupt:
