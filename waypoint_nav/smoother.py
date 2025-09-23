@@ -128,7 +128,7 @@ class PathSmoother(Node):
             [7.0, 0.0],
         ]) """
 
-        self.waypoints = np.array([
+        """ self.waypoints = np.array([
             [0.0, 0.0],
             [0.7, 0.3],
             [1.4, 0.8],
@@ -149,7 +149,56 @@ class PathSmoother(Node):
             [8.5, 0.7],
             [9.0, 0.0],
             [9.5, -0.5]
+        ]) """
+
+        """ self.waypoints = np.array([
+            [0.0, 0.0],
+            [0.5, 0.2],
+            [1.0, 0.7],
+            [1.5, 1.1],
+            [2.0, 0.9],
+            [2.3, 0.5],
+            [2.6, 0.0],
+            [3.0, -0.6],
+            [3.4, -1.0],
+            [3.8, -1.3],
+            [4.2, -1.6],
+            [4.6, -1.4],
+            [5.0, -1.0],
+            [5.4, -0.4],
+            [5.7, 0.0],
+            [6.1, 0.6],
+            [6.5, 1.1],
+            [6.9, 1.3],
+            [7.3, 1.0],
+            [7.7, 0.6]
+        ]) """
+
+
+        self.waypoints = np.array([
+            [0.0, 0.0],
+            [0.3, -0.3],
+            [0.7, -0.8],
+            [1.0, -1.2],
+            [1.3, -1.5],
+            [1.7, -1.7],
+            [2.1, -1.6],
+            [2.4, -1.4],
+            [2.7, -1.0],
+            [3.0, -0.5],
+            [3.4, 0.0],
+            [3.8, 0.6],
+            [4.2, 1.0],
+            [4.6, 1.3],
+            [5.0, 1.5],
+            [5.4, 1.3],
+            [5.8, 1.0],
+            [6.2, 0.6],
+            [6.6, 0.2],
+            [7.0, -0.1]
         ])
+
+
 
         """ self.waypoints = np.array([
             [0.0, 0.0],
@@ -235,13 +284,13 @@ class PathSmoother(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PathSmoother()
+    smoother_node = PathSmoother()
     try:
-        rclpy.spin(node)
+        rclpy.spin(smoother_node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
+        smoother_node.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':

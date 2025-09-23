@@ -19,7 +19,7 @@ class TrajectoryController(Node):
         self.declare_parameters(namespace='', parameters=[
             ('lookahead_distance', 0.3),
             ('max_linear_velocity', 0.5),
-            ('max_angular_velocity', 1.0),
+            ('max_angular_velocity', 0.5),
             ('position_tolerance', 0.1),
             ('orientation_tolerance', 0.1),
             ('kp_linear', 1.0),

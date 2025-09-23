@@ -1,5 +1,6 @@
 from setuptools import find_packages, setup
-
+import glob as glob
+import os
 package_name = 'waypoint_nav'
 
 setup(
@@ -10,6 +11,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/smooth_waypoint.launch.py']), 
+        ('share/' + package_name + '/rviz', ['rviz/smooth_trajectory.rviz']), 
     ],
     install_requires=['setuptools'],
     zip_safe=True,
