@@ -10,6 +10,7 @@ This repository implements path smoothing, time-parameterized trajectory generat
 
 - [Introduction](#introduction)
 - [Features](#features)
+- [Repository Structure](#repository-structure)
 - [Setup Instructions](#setup-instructions)
 - [Implementation Details](#implementation-details)
   - [Path Smoothing](#path-smoothing)
@@ -49,13 +50,15 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
 
 ## Repository Structure
 ```
-├── waypoint_nav/ # Main Python package
+├── waypoint_nav/ #Main Python package
 │ ├── init.py
 │ ├── smoother.py
 │ ├── controller.py 
 ├── launch/
-│ └── smooth_waypoint.launch.py 
-├── README.md # Project documentation
+│ └── smooth_waypoint.launch.py
+├── rviz/
+│ └── smooth_trajectory.rviz 
+├── README.md #Project documentation
 ├── package.xml 
 ├── setup.py 
 ├── setup.cfg
