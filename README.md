@@ -10,6 +10,7 @@ This repository implements path smoothing, time-parameterized trajectory generat
 
 - [Introduction](#introduction)
 - [Features](#features)
+- [Repository Structure](#repository-structure)
 - [Setup Instructions](#setup-instructions)
 - [Implementation Details](#implementation-details)
   - [Path Smoothing](#path-smoothing)
@@ -47,6 +48,27 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
 ### Logging & Debugging Support
 - Informational logs on trajectory reception and completion.
 
+## Repository Structure
+```
+├── waypoint_nav/ #Main Python package
+│ ├── init.py
+│ ├── smoother.py
+│ ├── controller.py 
+├── launch/
+│ └── smooth_waypoint.launch.py
+├── rviz/
+│ └── smooth_trajectory.rviz 
+├── README.md #Project documentation
+├── package.xml 
+├── setup.py 
+├── setup.cfg
+├── tests.py
+├── plot_traj.py
+├── setup.cfg 
+├── resource/
+│ └── waypoint_nav
+```
+
 ## Setup Instructions
 
 ### 0. Prerequisites
@@ -57,7 +79,7 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
 
 ```bash
 cd your_ws/src
-git clone git@github.com:ShauryaJain03/.git
+git clone git@github.com:ShauryaJain03/waypoint_nav.git
 
 ```
 ### 2. Build the Package
@@ -69,7 +91,17 @@ source install/setup.bash
 
 ### 3. Run the Nodes using the provided launch file
 ```bash
-ros2 launch smooth_waypoint_navigation smooth_waypoint.launch.py
+ros2 launch waypoint_nav smooth_waypoint.launch.py
+```
+### 4. Run the plot_traj file to visualise original waypoints with smoothed path using Matplotlib
+```bash
+cd ~your_ws/src/waypoint_nav
+python3 plot_traj.py
+```
+### 5. Run unit tests
+```bash
+cd ~/your_ws/src/waypoint_nav/
+python3 -m pytest tests.py
 ```
 ---
 
@@ -108,6 +140,19 @@ ros2 launch smooth_waypoint_navigation smooth_waypoint.launch.py
 
 ## Simulation and Results
 
+Click the following videos to see the results, tested on multiple different trajectories with varying number of waypoints. The green path shown in rviz2 is the smoothed trajectory output of the smoother node. The results have also been verified by using matplotlib to compare waypoints with the cubic spline interpolation based smooth trajectory, as shown in the pictures provided below.
+
+[![Result Tested on curved path with 20 waypoints](https://github.com/user-attachments/assets/0d5f5f2a-76c2-4eb6-92ed-cf14ca2d96be)](https://youtu.be/V2FzSY3q-2M)
+<br></br>
+[![Result Tested on curved path with 20 waypoints](https://github.com/user-attachments/assets/28040495-8265-4fe8-8850-8a7816bb37c5)](https://youtu.be/df07_CK_wnI)
+<br></br>
+
+Running plot_traj with 20 waypoint trajectory shown in simulation in the first video - 
+<img width="1853" height="1031" alt="Screenshot from 2025-09-24 13-29-07" src="https://github.com/user-attachments/assets/2add0020-4129-44ec-bcc8-4f13924d1c78" />
+<br></br>
+
+Running plot_traj with 50 waypoint trajectory shown in simulation in the second video - 
+<img width="1816" height="1028" alt="Screenshot from 2025-09-24 13-39-01" src="https://github.com/user-attachments/assets/4e593c99-70d3-4e96-af7b-eaeccacf7d97" />
 
 ---
 
@@ -154,4 +199,29 @@ By following these steps, the same ROS2 nodes can be used on real robots with mi
 
 ## Testing and Error Handling
 
+### Test Automation
+This repository uses **pytest** for automated testing of the path smoother and trajectory controller modules.  
+- Unit tests are written to validate individual functions such as spline interpolation, velocity computation, and trajectory tracking logic.  
+- Covers both normal cases (e.g., valid waypoint lists) and edge cases (e.g., empty waypoints, single-point trajectories, zero velocities, completion detection among others).
+- To run the tests:  
+  ```bash
+  cd ~/your_ws/src/waypoint_nav/
+  python3 -m pytest tests.py
+  ```
+
+### Error Handling
+Both **PathSmoother** and **TrajectoryController** include robust error handling to ensure safe operation in real and simulated environments.
+### Path Smoother
+- Handles empty or invalid waypoint arrays by returning an empty path instead of crashing.  
+- Supports edge cases such as single-waypoint or repeated points.  
+- Warns the user (via ROS logger) when input data is insufficient for smoothing.  
+- Falls back to safe defaults (e.g., minimum velocity) when parameters are misconfigured.  
+
+### Trajectory Controller
+- Validates odometry and trajectory inputs before computing control commands.  
+- Prevents division by zero and handles irregular time steps gracefully.  
+- Clamps linear and angular velocities to configurable safe limits.  
+- Stops the robot if trajectory data is missing, invalid, or trajectory is complete.  
+- Recovers from bad states by resetting PID error terms if data is stale or inconsistent.  
+  
 ---
