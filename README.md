@@ -136,7 +136,11 @@ python3 -m pytest tests.py
 ---
 
 ## Simulation and Results
+[![Result Tested on curved path with 20 waypoints](https://github.com/user-attachments/assets/0d5f5f2a-76c2-4eb6-92ed-cf14ca2d96be)](https://youtu.be/V2FzSY3q-2M)
+<br></br>
 
+Running plot_traj with the 20 waypoint trajectory given above - 
+<img width="1853" height="1031" alt="Screenshot from 2025-09-24 13-29-07" src="https://github.com/user-attachments/assets/2add0020-4129-44ec-bcc8-4f13924d1c78" />
 
 ---
 
