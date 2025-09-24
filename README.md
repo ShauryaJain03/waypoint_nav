@@ -79,7 +79,7 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
 
 ```bash
 cd your_ws/src
-git clone git@github.com:ShauryaJain03/.git
+git clone git@github.com:ShauryaJain03/waypoint_nav.git
 
 ```
 ### 2. Build the Package
