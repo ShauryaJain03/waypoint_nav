@@ -47,6 +47,25 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
 ### Logging & Debugging Support
 - Informational logs on trajectory reception and completion.
 
+## Repository Structure
+```
+├── waypoint_nav/ # Main Python package
+│ ├── init.py
+│ ├── smoother.py
+│ ├── controller.py 
+├── launch/
+│ └── smooth_waypoint.launch.py 
+├── README.md # Project documentation
+├── package.xml 
+├── setup.py 
+├── setup.cfg
+├── tests.py
+├── plot_traj.py
+├── setup.cfg 
+├── resource/
+│ └── waypoint_nav
+```
+
 ## Setup Instructions
 
 ### 0. Prerequisites
@@ -69,7 +88,7 @@ source install/setup.bash
 
 ### 3. Run the Nodes using the provided launch file
 ```bash
-ros2 launch smooth_waypoint_navigation smooth_waypoint.launch.py
+ros2 launch waypoint_nav smooth_waypoint.launch.py
 ```
 ---
 
@@ -154,4 +173,29 @@ By following these steps, the same ROS2 nodes can be used on real robots with mi
 
 ## Testing and Error Handling
 
+### Test Automation
+This repository uses **pytest** for automated testing of the path smoother and trajectory controller modules.  
+- Unit tests are written to validate individual functions such as spline interpolation, velocity computation, and trajectory tracking logic.  
+- Covers both normal cases (e.g., valid waypoint lists) and edge cases (e.g., empty waypoints, single-point trajectories, zero velocities, completion detection among others).
+- To run the test suite:  
+  ```bash
+  cd ~/your_ws/src/waypoint_nav/
+  python3 -m pytest tests.py
+  ```
+
+### Error Handling
+Both **PathSmoother** and **TrajectoryController** include robust error handling to ensure safe operation in real and simulated environments.
+### Path Smoother
+- Handles empty or invalid waypoint arrays by returning an empty path instead of crashing.  
+- Supports edge cases such as single-waypoint or repeated points.  
+- Warns the user (via ROS logger) when input data is insufficient for smoothing.  
+- Falls back to safe defaults (e.g., minimum velocity) when parameters are misconfigured.  
+
+### Trajectory Controller
+- Validates odometry and trajectory inputs before computing control commands.  
+- Prevents division by zero and handles irregular time steps gracefully.  
+- Clamps linear and angular velocities to configurable safe limits.  
+- Stops the robot if trajectory data is missing, invalid, or trajectory is complete.  
+- Recovers from bad states by resetting PID error terms if data is stale or inconsistent.  
+  
 ---
