@@ -90,6 +90,16 @@ source install/setup.bash
 ```bash
 ros2 launch waypoint_nav smooth_waypoint.launch.py
 ```
+### 4. Run the plot_traj file to visualise original waypoints with smoothed path using Matplotlib
+```bash
+cd ~your_ws/src/waypoint_nav
+python3 plot_traj.py
+```
+### 5. Run unit tests
+```bash
+cd ~/your_ws/src/waypoint_nav/
+python3 -m pytest tests.py
+```
 ---
 
 ## Implementation Details
@@ -177,7 +187,7 @@ By following these steps, the same ROS2 nodes can be used on real robots with mi
 This repository uses **pytest** for automated testing of the path smoother and trajectory controller modules.  
 - Unit tests are written to validate individual functions such as spline interpolation, velocity computation, and trajectory tracking logic.  
 - Covers both normal cases (e.g., valid waypoint lists) and edge cases (e.g., empty waypoints, single-point trajectories, zero velocities, completion detection among others).
-- To run the test suite:  
+- To run the tests:  
   ```bash
   cd ~/your_ws/src/waypoint_nav/
   python3 -m pytest tests.py
