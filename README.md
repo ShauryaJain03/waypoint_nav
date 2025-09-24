@@ -141,6 +141,10 @@ python3 -m pytest tests.py
 
 Running plot_traj with the 20 waypoint trajectory given above - 
 <img width="1853" height="1031" alt="Screenshot from 2025-09-24 13-29-07" src="https://github.com/user-attachments/assets/2add0020-4129-44ec-bcc8-4f13924d1c78" />
+<br></br>
+
+Running plot_traj with 50 waypoint trajectory - 
+<img width="1816" height="1028" alt="Screenshot from 2025-09-24 13-39-01" src="https://github.com/user-attachments/assets/4e593c99-70d3-4e96-af7b-eaeccacf7d97" />
 
 ---
 
