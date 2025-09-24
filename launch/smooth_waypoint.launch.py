@@ -23,6 +23,18 @@ def generate_launch_description():
         )]
     )
 
+    obstacle_avoidance_node = TimerAction(
+        period=3.0,
+        actions=[
+            Node(
+            package='waypoint_nav', 
+            executable='obstacle_avoid',
+            name='replanner',
+            output='screen',
+        )]
+    )
+
+
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -33,6 +45,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         smoother_node,
+        obstacle_avoidance_node,
         controller_node,
         rviz_node
     ])

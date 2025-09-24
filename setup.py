@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/smooth_waypoint.launch.py']), 
         ('share/' + package_name + '/rviz', ['rviz/smooth_trajectory.rviz']), 
+
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -25,7 +26,7 @@ setup(
         'console_scripts': [
             "smoother=waypoint_nav.smoother:main",
             "controller=waypoint_nav.controller:main",
-            "obstacle=waypoint_nav.obstacle:main"
+            "obstacle_avoid=waypoint_nav.obstacle_avoid:main",
         ],
     },
 )

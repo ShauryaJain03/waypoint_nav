@@ -18,7 +18,7 @@ class TrajectoryController(Node):
         #Subscribe to the smoothed path (Path message) and robot odometry
         #Path -> produced by PathSmoother. Odometry -> current robot pose.
         self.trajectory_sub = self.create_subscription(
-            Path, '/trajectory', self.trajectory_callback, 10)
+            Path, '/modified_trajectory', self.trajectory_callback, 10)
         self.odom_sub = self.create_subscription(
             Odometry, '/odom', self.odom_callback, 10)
         
