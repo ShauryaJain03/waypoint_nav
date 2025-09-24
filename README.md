@@ -136,14 +136,19 @@ python3 -m pytest tests.py
 ---
 
 ## Simulation and Results
+
+Click the following videos to see the results, tested on multiple different trajectories with varying number of waypoints. The green path shown in rviz2 is the smoothed trajectory output of the smoother node. The results have also been verified by using matplotlib to compare waypoints with the cubic spline interpolation based smooth trajectory, as shown in the pictures provided below.
+
 [![Result Tested on curved path with 20 waypoints](https://github.com/user-attachments/assets/0d5f5f2a-76c2-4eb6-92ed-cf14ca2d96be)](https://youtu.be/V2FzSY3q-2M)
 <br></br>
+[![Result Tested on curved path with 20 waypoints](https://github.com/user-attachments/assets/28040495-8265-4fe8-8850-8a7816bb37c5)](https://youtu.be/df07_CK_wnI)
+<br></br>
 
-Running plot_traj with the 20 waypoint trajectory given above - 
+Running plot_traj with 20 waypoint trajectory shown in simulation in the first video - 
 <img width="1853" height="1031" alt="Screenshot from 2025-09-24 13-29-07" src="https://github.com/user-attachments/assets/2add0020-4129-44ec-bcc8-4f13924d1c78" />
 <br></br>
 
-Running plot_traj with 50 waypoint trajectory - 
+Running plot_traj with 50 waypoint trajectory shown in simulation in the second video - 
 <img width="1816" height="1028" alt="Screenshot from 2025-09-24 13-39-01" src="https://github.com/user-attachments/assets/4e593c99-70d3-4e96-af7b-eaeccacf7d97" />
 
 ---
