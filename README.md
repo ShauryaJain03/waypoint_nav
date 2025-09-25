@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository implements path smoothing, time-parameterized trajectory generation, and trajectory tracking for a differential drive robot navigating through 2D waypoints using ROS2 as part of the assessment for 10xConstruction.ai's Robotics Software Apprentice position.
+This repository implements path smoothing, time-parameterized trajectory generation, obstacle avoidance and trajectory tracking for a differential drive robot navigating through 2D waypoints using ROS2 as part of the assessment for 10xConstruction.ai's Robotics Software Apprentice position.
 
 ---
 
@@ -16,6 +16,7 @@ This repository implements path smoothing, time-parameterized trajectory generat
   - [Path Smoothing](#path-smoothing)
   - [Trajectory Generation](#trajectory-generation)
   - [Tracking Controller](#tracking-controller)
+  - [Obstacle Avoidance](#obstacle-avoidance)
 - [Simulation and Results](#simulation-and-results)
 - [Extending to Real Robot](#extending-to-real-robot)
 - [AI Tool Support](#ai-tool-support)
@@ -24,12 +25,14 @@ This repository implements path smoothing, time-parameterized trajectory generat
 ---
 
 ## Introduction
-Developed a package consisting of two modular ROS2 nodes:
+Developed a package consisting of three modular ROS2 nodes:
 
 ### PathSmoother
 Generates a smooth, continuous, and time-parameterized trajectory from discrete waypoints using cubic spline interpolation.
 ### TrajectoryController
 Implements a PID-based pure pursuit trajectory tracking controller that takes the smoothed trajectory as input and outputs velocity commands for the robot.
+### ObstacleAvoidance
+Monitors the robot’s planned trajectory in real time, checks for obstacles using 2D LiDAR data, and dynamically modifies the trajectory to avoid collisions while ensuring the robot resumes the original path afterward.
 
 ## Features
 
@@ -38,6 +41,13 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
   
 ### Time Parameterization
 - Assigns timestamps to trajectory points based on desired velocity
+
+### Obstacle Avoidance 
+- Detects obstacles along the planned path using LIDAR data (sensor_msgs/LaserScan).
+- Dynamically generates detour waypoints perpendicular to the blocked trajectory direction.
+- Ensures the robot bypasses the obstacle completely before resuming the original trajectory.
+- Keeps track of visited waypoints to prevent the robot from looping back into already-traversed points.
+- Publishes visualization markers (visualization_msgs/MarkerArray) in RViz2 to display the modified path and robot heading for debugging.
   
 ### Outputs a time-parameterized trajectory (nav_msgs/Path)
 - Implements a PID-based pure pursuit controller for both linear and angular velocity and publishes standard ROS2 velocity commands (geometry_msgs/Twist) for differential drive robots.
@@ -53,6 +63,7 @@ Implements a PID-based pure pursuit trajectory tracking controller that takes th
 ├── waypoint_nav/ #Main Python package
 │ ├── init.py
 │ ├── smoother.py
+│ ├── obstacle_avoid.py
 │ ├── controller.py 
 ├── launch/
 │ └── smooth_waypoint.launch.py
@@ -120,7 +131,21 @@ python3 -m pytest tests.py
 - The smoothed path is **time-parameterized** based on a desired constant velocity. 
 - This produces a **trajectory with relative timing**, ensuring the robot executes the path at the expected speed.  
 - Published as a `nav_msgs/Path` where each pose includes a timestamp in its header.  
-- Ready for consumption by the controller without further preprocessing.  
+- Ready for consumption by the controller without further preprocessing.
+
+### Obstacle Avoidance
+- Continuously monitors:
+  - The planned trajectory (`/trajectory`)
+  - The robot’s current position (`/odom`)
+- Uses LaserScan data (`/scan`) to detect obstacles near upcoming waypoints.
+- If a waypoint lies within a **configurable safety radius**, it is marked as **blocked**.
+- Generates temporary detour waypoints by shifting the trajectory **perpendicular** to the blocked direction.
+- Tries both **left** and **right** detours, selecting the first **collision-free** option.
+- Supports **multi-step detours** until the obstacle is fully bypassed.
+- Once the robot clears the obstacle, it resumes the **original trajectory** at the next unvisited waypoint.
+- Maintains a set of **visited waypoints** to avoid looping back.
+- Always selects the **closest unvisited waypoint** as the new tracking target.
+- Publishes a `MarkerArray` to **RViz2** for debugging
 
 ### Tracking Controller
 - Implemented in the **`TrajectoryController`** node.  
